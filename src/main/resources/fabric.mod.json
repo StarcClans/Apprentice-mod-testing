@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "apprentice-mod",
+  "version": "${version}",
+  "name": "Apprentice Mod",
+  "description": "This is an example description!",
+  "authors": [
+    "Me"
+  ],
+  "contact": {
+    "homepage": "",
+    "sources": ""
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.starcclans.apprentice.apprenticemod.ApprenticeMod"
+    ],
+    "client": [
+      "net.starcclans.apprentice.apprenticemod.client.ApprenticeModClient"
+    ]
+  },
+  "mixins": [
+    "apprentice-mod.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.12.5",
+    "fabric": "*",
+    "minecraft": "1.19.2"
+  }
+}
