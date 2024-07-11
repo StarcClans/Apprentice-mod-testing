@@ -1,0 +1,15 @@
+{
+  "villager": {
+    "greeting": "Hello, traveler!",
+    "options": [
+      {
+        "text": "Tell me about this place.",
+        "response": "This village has been here for centuries..."
+      },
+      {
+        "text": "Can we trade?",
+        "response": "Sure, let's see what you have."
+      }
+    ]
+  }
+}
