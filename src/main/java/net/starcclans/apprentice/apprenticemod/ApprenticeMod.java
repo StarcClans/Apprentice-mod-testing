@@ -40,3 +40,4 @@ public class ApprenticeMod implements ModInitializer {
         });
     }
 }
+//
