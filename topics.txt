@@ -1,2 +1,0 @@
-object=ball,car,phone
-activities=swimming,running,jumping
