@@ -3,32 +3,36 @@ package net.starcclans.apprentice.apprenticemod.screen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
+
+
 import java.io.*;
 import java.nio.file.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-//import java.util.stream.Collectors;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class CustomVillagerScreen extends Screen {
 
     private String userInput = "";
-    private List<String> botResponses = new ArrayList<>();
+    private final List<String> botResponses = new ArrayList<>();
     private boolean endConversation = false;
     private int moodPercentage = 100;
     private String userName;
 
-    private List<List<String>> allVerbVectors = new ArrayList<>();
+    private final List<List<String>> allVerbVectors;
+    private Map<String, List<String>> topics = new HashMap<>();
 
     public CustomVillagerScreen(Text title) {
         super(title);
+        allVerbVectors = loadListFromFile("verbVectors.txt");
+        topics = loadMapFromFile("topics.txt");
     }
 
     @Override
     protected void init() {
         super.init();
-        // Additional initialization code for your custom UI
     }
 
     @Override
@@ -78,14 +82,30 @@ public class CustomVillagerScreen extends Screen {
         botResponses.clear();
 
         if (!endConversation) {
-            moodPercentage = manageMood(userInput, moodPercentage);
-            List<List<String>> sentences = convertToSentences(userInput);
-            List<Integer> result = compareAndOutput(sentences, allVerbVectors);
-            List<List<Integer>> formattedOutput = formatOutput(result);
-            List<Integer> arrPattern = formattedOutput.stream().map(CustomVillagerScreen::comparePattern).toList();
+            System.out.println("User Input: " + userInput); // Debug: Print user input
 
-            for (int pattern : arrPattern) {
-                botResponses.addAll(botResponse(pattern, userName, sentences));
+            moodPercentage = manageMood(userInput, moodPercentage);
+
+            if (!userInput.equals(userInput.toLowerCase())) {
+                userInput = userInput.toLowerCase();
+            }
+
+            List<List<String>> sentences = convertToSentences(userInput);
+            System.out.println("Sentences: " + sentences); // Debug: Print sentences
+
+            sentences = removeDuplicateSentences(sentences);
+            System.out.println("Unique Sentences: " + sentences); // Debug: Print unique sentences
+
+            List<Integer> result = compareAndOutput(sentences, allVerbVectors);
+            System.out.println("Compare and Output Result: " + result); // Debug: Print result
+
+            List<List<Integer>> formattedOutput = formatOutput(result);
+            System.out.println("Formatted Output: " + formattedOutput); // Debug: Print formatted output
+
+            for (int i = 0; i < sentences.size(); i++) {
+                int pattern = comparePattern(formattedOutput.get(i));
+                System.out.println("Pattern: " + pattern); // Debug: Print pattern
+                botResponses.add(botResponse(pattern, userName, sentences.get(i)));
             }
 
             if (userInput.equalsIgnoreCase("bye")) {
@@ -96,9 +116,23 @@ public class CustomVillagerScreen extends Screen {
         }
     }
 
+    private static List<List<String>> removeDuplicateSentences(List<List<String>> sentences) {
+        List<List<String>> uniqueSentences = new ArrayList<>();
+        Set<String> seenSentences = new HashSet<>();
+
+        for (List<String> sentence : sentences) {
+            String sentenceString = String.join(" ", sentence).toLowerCase();
+            if (!seenSentences.contains(sentenceString)) {
+                uniqueSentences.add(sentence);
+                seenSentences.add(sentenceString);
+            }
+        }
+
+        return uniqueSentences;
+    }
+
     private static int manageMood(String userInput, int currentMood) {
         int decreaseMultiplier = 20; // 20% decrease for each word in all caps
-        int maxMood = 100;
 
         // Check if the user input contains all caps
         for (char ch : userInput.toCharArray()) {
@@ -125,8 +159,9 @@ public class CustomVillagerScreen extends Screen {
                     stringArrays.add(new ArrayList<>(currentSentence));
                     currentSentence.clear();
                 }
+            } else {
+                currentSentence.add(word);
             }
-            currentSentence.add(word);
         }
 
         if (!currentSentence.isEmpty()) {
@@ -136,39 +171,34 @@ public class CustomVillagerScreen extends Screen {
         return stringArrays;
     }
 
-    private static List<String> botResponse(int pattern, String userName, List<List<String>> sentences) {
-        List<String> response = new ArrayList<>();
+    private static String botResponse(int pattern, String userName, List<String> sentence) {
+        List<String> rearrangedSentence = new ArrayList<>(Collections.nCopies(sentence.size(), ""));
+        StringBuilder rearrangedStr = new StringBuilder();
 
-        for (List<String> sentence : sentences) {
-            List<String> rearrangedSentence = new ArrayList<>(Collections.nCopies(sentence.size(), ""));
-            StringBuilder rearrangedStr = new StringBuilder();
-
-            switch (pattern) {
-                case 0:
-                    response.add("Sorry to tell you man, but I don't understand what you typed");
-                    break;
-                case 1:
-                case 2:
-                case 3:
-                case 4:
+        switch (pattern) {
+            case 0:
+                return "Sorry to tell you man, but I don't understand what you typed";
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+                if (sentence.size() > 1) {
                     rearrangedSentence.set(0, sentence.get(1));
                     rearrangedSentence.set(1, sentence.get(0));
                     for (int word = 2; word < sentence.size(); ++word) {
                         rearrangedSentence.set(word, sentence.get(word));
                     }
                     rearrangedSentence.forEach(word -> rearrangedStr.append(word).append(" "));
-                    response.add(rearrangedStr.toString().trim());
-                    break;
-                default:
-                    response.add("I'm not sure how to respond to that.");
-                    break;
-            }
+                    return rearrangedStr.toString().trim();
+                } else {
+                    return "Sorry, I couldn't parse your sentence.";
+                }
+            default:
+                return "I'm not sure how to respond to that.";
         }
-
-        return response;
     }
 
-    private static List<Integer> compareAndOutput(List<List<String>> sentences, List<List<String>> allVerbVectors) {
+    private List<Integer> compareAndOutput(List<List<String>> sentences, List<List<String>> allVerbVectors) {
         List<Integer> result = new ArrayList<>();
         int sentenceIndex = 0;
 
@@ -187,9 +217,33 @@ public class CustomVillagerScreen extends Screen {
                 }
 
                 if (!found) {
-                    result.add(sentenceIndex + 1);
-                    result.add(j + 1);
-                    result.add(0);
+                    // If word is not found in verbVectors, check topics
+                    boolean topicFound = false;
+                    for (String topic : topics.keySet()) {
+                        if (topics.get(topic).contains(sentence.get(j))) {
+                            result.add(sentenceIndex + 1);
+                            result.add(j + 1);
+                            result.add(allVerbVectors.size() + topics.keySet().stream().toList().indexOf(topic) + 1);
+                            topicFound = true;
+                            break;
+                        }
+                    }
+
+                    if (!topicFound) {
+                        // Prompt user to add to topics
+                        String newTopic = getUserInput("Please provide a category for the word: " + sentence.get(j));
+                        if (!newTopic.isEmpty()) {
+                            topics.computeIfAbsent(newTopic, k -> new ArrayList<>()).add(sentence.get(j));
+                            saveMapToFile(topics, "topics.txt");
+                            result.add(sentenceIndex + 1);
+                            result.add(j + 1);
+                            result.add(allVerbVectors.size() + topics.keySet().stream().toList().indexOf(newTopic) + 1);
+                        } else {
+                            result.add(sentenceIndex + 1);
+                            result.add(j + 1);
+                            result.add(0);
+                        }
+                    }
                 }
             }
             sentenceIndex++;
@@ -261,5 +315,64 @@ public class CustomVillagerScreen extends Screen {
 
     private static String getCurrentTime() {
         return LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+    }
+
+    private static void saveListToFile(List<List<String>> list, String filename) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
+            for (List<String> sublist : list) {
+                writer.write(String.join(",", sublist));
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error: Unable to write to file " + filename);
+        }
+    }
+
+    private static List<List<String>> loadListFromFile(String filename) {
+        List<List<String>> list = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                list.add(Arrays.asList(line.split(",")));
+            }
+        } catch (IOException e) {
+            System.err.println("Error: Unable to read file " + filename);
+        }
+        return list;
+    }
+
+    private static void saveMapToFile(Map<String, List<String>> map, String filename) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
+            for (Map.Entry<String, List<String>> entry : map.entrySet()) {
+                writer.write(entry.getKey() + "=" + String.join(",", entry.getValue()));
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("Error: Unable to write to file " + filename);
+        }
+    }
+
+    private static Map<String, List<String>> loadMapFromFile(String filename) {
+        Map<String, List<String>> map = new HashMap<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("=");
+                if (parts.length == 2) {
+                    map.put(parts[0], Arrays.asList(parts[1].split(",")));
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error: Unable to read file " + filename);
+        }
+        return map;
+    }
+
+    private String getUserInput(String prompt) {
+        // Prompt the user with a message and get input
+        // This is a placeholder for the actual implementation
+        System.out.println(prompt);
+        Scanner scanner = new Scanner(System.in);
+        return scanner.nextLine().trim();
     }
 }
